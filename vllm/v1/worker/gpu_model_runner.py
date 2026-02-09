@@ -10,7 +10,7 @@ from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from copy import copy, deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import reduce
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, cast
 
@@ -1814,8 +1814,14 @@ class GPUModelRunner(
                 assert isinstance(attn_metadata, list)
                 attn_metadata_dict = attn_metadata[ubid]
 
-            for layer_name in attn_group.layer_names:
-                attn_metadata_dict[layer_name] = attn_metadata_i
+            if hasattr(attn_metadata_i, "layer_idx"):
+                for layer_idx, layer_name in enumerate(attn_group.layer_names):
+                    attn_metadata_dict[layer_name] = replace(
+                        attn_metadata_i, layer_idx=layer_idx
+                    )
+            else:
+                for layer_name in attn_group.layer_names:
+                    attn_metadata_dict[layer_name] = attn_metadata_i
 
         # Prepare the attention metadata for each KV cache group and make layers
         # in the same group share the same metadata.

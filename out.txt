@@ -1,0 +1,897 @@
+
+    ╔═══════════════════════════════════════════════════════════════════╗
+    ║      Quest Standalone KV Cache Test Suite                        ║
+    ║                                                                   ║
+    ║  New Architecture:                                                ║
+    ║    ✓ Quest manages its own KV cache (KvCache class)              ║
+    ║    ✓ Quest manages metadata cache (element-wise min/max)         ║
+    ║    ✓ vLLM provides TP/PP framework and scheduling                ║
+    ║    ✓ No vLLM KV cache dependency                                 ║
+    ║    ✓ Testing with OPT-125M (MHA model)                           ║
+    ║                                                                   ║
+    ║  Key APIs:                                                        ║
+    ║    • VllmQuestController.prepare_metadata(seq_len)                ║
+    ║    • VllmQuestController.begin_forward(seq_len)                   ║
+    ║    • VllmQuestController.append_kv_and_metadata(k, v, ...)        ║
+    ║    • VllmQuestController.sparse_decode_attention(q, ...)          ║
+    ║                                                                   ║
+    ║  Environment:                                                     ║
+    ║    VLLM_QUEST_PAGE_SIZE=16                                        ║
+    ║    VLLM_QUEST_TOKEN_BUDGET=512                                    ║
+    ║    VLLM_QUEST_MAX_SEQ_LEN=32768                                   ║
+    ╚═══════════════════════════════════════════════════════════════════╝
+    
+
+================================================================================
+Test 8: Quest Backend - Basic Generation
+================================================================================
+INFO 02-09 18:40:46 [utils.py:282] non-default args: {'max_model_len': 4096, 'gpu_memory_utilization': 0.3, 'disable_log_stats': True, 'enable_chunked_prefill': False, 'attention_backend': 'QUEST', 'model': 'meta-llama/Llama-2-7b-hf'}
+INFO 02-09 18:40:47 [model.py:541] Resolved architecture: LlamaForCausalLM
+INFO 02-09 18:40:47 [model.py:1558] Using max model len 4096
+WARNING 02-09 18:40:47 [arg_utils.py:1909] This model does not officially support disabling chunked prefill. Disabling this manually may cause the engine to crash or produce incorrect outputs.
+INFO 02-09 18:40:48 [vllm.py:640] Asynchronous scheduling is enabled.
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:49 [core.py:96] Initializing a V1 LLM engine (v0.15.0rc2.dev58+g07ea184f0) with config: model='meta-llama/Llama-2-7b-hf', speculative_config=None, tokenizer='meta-llama/Llama-2-7b-hf', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.float16, max_seq_len=4096, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False), seed=0, served_model_name=meta-llama/Llama-2-7b-hf, enable_prefix_caching=True, enable_chunked_prefill=False, pooler_config=None, compilation_config={'level': None, 'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'splitting_ops': ['vllm::unified_attention', 'vllm::unified_attention_with_output', 'vllm::unified_mla_attention', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::linear_attention', 'vllm::plamo2_mamba_mixer', 'vllm::gdn_attention_core', 'vllm::kda_attention', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer'], 'compile_mm_encoder': False, 'compile_sizes': [], 'compile_ranges_split_points': [8192], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'eliminate_noops': True, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'fuse_act_padding': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'static_all_moe_layers': []}
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:52 [parallel_state.py:1234] world_size=1 rank=0 local_rank=0 distributed_init_method=tcp://147.46.91.47:51459 backend=nccl
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:52 [parallel_state.py:1445] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, EP rank N/A
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:53 [gpu_model_runner.py:4084] Starting to load model meta-llama/Llama-2-7b-hf...
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [cuda.py:328] Using AttentionBackendEnum.QUEST backend.
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:54 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:58 [default_loader.py:291] Loading weights took 2.77 seconds
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:40:59 [gpu_model_runner.py:4181] Model loading took 12.55 GiB memory and 5.485599 seconds
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:04 [backends.py:802] Using cache directory: /home2/esthersong7/.cache/vllm/torch_compile_cache/9ebf0a1dae/rank_0_0/backbone for vLLM's torch.compile
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:04 [backends.py:862] Dynamo bytecode transform time: 5.02 s
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:09 [backends.py:264] Directly load the compiled graph(s) for compile range (1, 8192) from the cache, took 1.336 s
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:09 [monitor.py:34] torch.compile takes 6.36 s in total
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:10 [gpu_worker.py:359] Available KV cache memory: 10.49 GiB
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:10 [kv_cache_utils.py:1307] GPU KV cache size: 21,472 tokens
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:10 [kv_cache_utils.py:1312] Maximum concurrency for 4,096 tokens per request: 5.24x
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m WARNING 02-09 18:41:10 [gpu_model_runner.py:5393] CUDAGraphMode.FULL_AND_PIECEWISE is not supported with QuestBackend backend (support: AttentionCGSupport.NEVER); setting cudagraph_mode=PIECEWISE because attention is compiled piecewise
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:10 [quest.py:148] Quest backend initialized with page_size=16
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:16 [gpu_model_runner.py:5114] Graph capturing finished in 5 secs, took 0.36 GiB
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:16 [core.py:272] init engine (profile, create kv cache, warmup model) took 16.64 seconds
+INFO 02-09 18:41:17 [llm.py:343] Supported tasks: ['generate']
+Adding request 0 / Hello, my name is Alice and I am a software engineer. I work at a tech company in Silicon Valley. I love programming in Python and building AI systems. Today I want to tell you about 
+Added request ID: 0-9a264d4d
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:422] QuestImpl initializing shared controller 
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:378] Initialized Quest controller: page_budget=32, max_seq_len=4096, skip_layers=2, num_kv_heads=32 (TP-split)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L0] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=0
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:451] [Quest] New sequence, clean states: (kv_len=0 → 0)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 45: kv_seqlen=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:475] [Quest L0] After prepare: kv_seqlen=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L1] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L2] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L3] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L4] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L5] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L6] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L7] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L8] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L9] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L10] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L11] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L12] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:17 [quest.py:437] [Quest L13] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L14] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L15] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L16] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L17] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L18] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L19] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L20] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L21] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L22] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L23] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L24] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L25] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L26] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L27] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L28] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L29] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L30] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L31] forward(): is_prefill=True, seq_len=45, num_tokens=48, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=45
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:475] [Quest L0] After prepare: kv_seqlen=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=3, page_budget=3
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=46, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=46
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:475] [Quest L0] After prepare: kv_seqlen=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=3, page_budget=3
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=47, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=47
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:475] [Quest L0] After prepare: kv_seqlen=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=3, page_budget=3
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=48, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=48
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:475] [Quest L0] After prepare: kv_seqlen=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=4, page_budget=4
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=49, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=49
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:475] [Quest L0] After prepare: kv_seqlen=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=4, page_budget=4
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=50, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=50
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:475] [Quest L0] After prepare: kv_seqlen=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=4, page_budget=4
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=51, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=51
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:475] [Quest L0] After prepare: kv_seqlen=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=4, page_budget=4
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=52, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=52
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:475] [Quest L0] After prepare: kv_seqlen=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=4, page_budget=4
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=53, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=53
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:475] [Quest L0] After prepare: kv_seqlen=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=4, page_budget=4
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+[0;36m(EngineCore_DP0 pid=1661220)[0;0m INFO 02-09 18:41:18 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=54, num_tokens=1, current_kv_len=54
+   Prompt: 'Hello, my name is Alice and I am a software engineer. I work at a tech company in Silicon Valley. I love programming in Python and building AI systems. Today I want to tell you about '
+   Generated: '3 things that I think are important for a software'
+✅ Backend basic generation test passed!
+
+================================================================================
+Test 9: Quest Backend - Long Context Sparse Attention
+================================================================================
+INFO 02-09 18:41:26 [utils.py:282] non-default args: {'max_model_len': 4096, 'gpu_memory_utilization': 0.3, 'disable_log_stats': True, 'enable_chunked_prefill': False, 'attention_backend': 'QUEST', 'model': 'meta-llama/Llama-2-7b-hf'}
+INFO 02-09 18:41:28 [model.py:541] Resolved architecture: LlamaForCausalLM
+INFO 02-09 18:41:28 [model.py:1558] Using max model len 4096
+WARNING 02-09 18:41:28 [arg_utils.py:1909] This model does not officially support disabling chunked prefill. Disabling this manually may cause the engine to crash or produce incorrect outputs.
+INFO 02-09 18:41:28 [vllm.py:640] Asynchronous scheduling is enabled.
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:29 [core.py:96] Initializing a V1 LLM engine (v0.15.0rc2.dev58+g07ea184f0) with config: model='meta-llama/Llama-2-7b-hf', speculative_config=None, tokenizer='meta-llama/Llama-2-7b-hf', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.float16, max_seq_len=4096, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False), seed=0, served_model_name=meta-llama/Llama-2-7b-hf, enable_prefix_caching=True, enable_chunked_prefill=False, pooler_config=None, compilation_config={'level': None, 'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'splitting_ops': ['vllm::unified_attention', 'vllm::unified_attention_with_output', 'vllm::unified_mla_attention', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::linear_attention', 'vllm::plamo2_mamba_mixer', 'vllm::gdn_attention_core', 'vllm::kda_attention', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer'], 'compile_mm_encoder': False, 'compile_sizes': [], 'compile_ranges_split_points': [8192], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'eliminate_noops': True, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'fuse_act_padding': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'static_all_moe_layers': []}
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:32 [parallel_state.py:1234] world_size=1 rank=0 local_rank=0 distributed_init_method=tcp://147.46.91.47:35477 backend=nccl
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:32 [parallel_state.py:1445] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, EP rank N/A
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:33 [gpu_model_runner.py:4084] Starting to load model meta-llama/Llama-2-7b-hf...
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [cuda.py:328] Using AttentionBackendEnum.QUEST backend.
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:34 [quest.py:344] Quest attention initialized: num_heads=32, num_kv_heads=32, head_size=128, page_size=16, token_budget=512
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:38 [default_loader.py:291] Loading weights took 2.78 seconds
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:39 [gpu_model_runner.py:4181] Model loading took 12.55 GiB memory and 5.408045 seconds
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:44 [backends.py:802] Using cache directory: /home2/esthersong7/.cache/vllm/torch_compile_cache/9ebf0a1dae/rank_0_0/backbone for vLLM's torch.compile
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:44 [backends.py:862] Dynamo bytecode transform time: 5.04 s
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:49 [backends.py:264] Directly load the compiled graph(s) for compile range (1, 8192) from the cache, took 1.331 s
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:49 [monitor.py:34] torch.compile takes 6.37 s in total
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:50 [gpu_worker.py:359] Available KV cache memory: 10.49 GiB
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:50 [kv_cache_utils.py:1307] GPU KV cache size: 21,472 tokens
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:50 [kv_cache_utils.py:1312] Maximum concurrency for 4,096 tokens per request: 5.24x
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m WARNING 02-09 18:41:50 [gpu_model_runner.py:5393] CUDAGraphMode.FULL_AND_PIECEWISE is not supported with QuestBackend backend (support: AttentionCGSupport.NEVER); setting cudagraph_mode=PIECEWISE because attention is compiled piecewise
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:50 [quest.py:148] Quest backend initialized with page_size=16
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:56 [gpu_model_runner.py:5114] Graph capturing finished in 5 secs, took 0.36 GiB
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:56 [core.py:272] init engine (profile, create kv cache, warmup model) took 16.55 seconds
+INFO 02-09 18:41:57 [llm.py:343] Supported tasks: ['generate']
+Adding request 0 / Text: The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. 
+
+Question: What animal jumps? Answer:
+Added request ID: 0-bc4b14f1
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:422] QuestImpl initializing shared controller 
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:378] Initialized Quest controller: page_budget=32, max_seq_len=4096, skip_layers=2, num_kv_heads=32 (TP-split)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L0] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=0
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:451] [Quest] New sequence, clean states: (kv_len=0 → 0)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 975: kv_seqlen=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:475] [Quest L0] After prepare: kv_seqlen=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L1] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L2] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L3] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L4] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L5] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L6] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L7] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L8] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L9] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L10] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L11] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L12] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L13] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L14] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L15] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L16] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L17] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L18] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L19] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L20] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L21] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L22] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L23] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L24] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L25] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L26] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L27] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L28] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L29] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L30] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L31] forward(): is_prefill=True, seq_len=975, num_tokens=975, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=975
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:475] [Quest L0] After prepare: kv_seqlen=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=61, page_budget=61
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:57 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=976, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=976
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:475] [Quest L0] After prepare: kv_seqlen=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=62, page_budget=62
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=977, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=977
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:475] [Quest L0] After prepare: kv_seqlen=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=62, page_budget=62
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=978, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=978
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:475] [Quest L0] After prepare: kv_seqlen=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=62, page_budget=62
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=979, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=979
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:475] [Quest L0] After prepare: kv_seqlen=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=62, page_budget=62
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=980, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=980
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:475] [Quest L0] After prepare: kv_seqlen=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=62, page_budget=62
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=981, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=981
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:475] [Quest L0] After prepare: kv_seqlen=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=62, page_budget=62
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=982, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=982
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:475] [Quest L0] After prepare: kv_seqlen=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=62, page_budget=62
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=983, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L0] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=983
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:463] [Quest] After prepare_metadata w/ actual new tokens = 1: kv_seqlen=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:475] [Quest L0] After prepare: kv_seqlen=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:516] [Quest L0 Decode] need_sparse=False, num_pages=62, page_budget=62
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L1] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L2] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:480] [Quest L2] Switching to sparse attention (skip_layers=2)
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L3] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L4] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L5] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L6] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L7] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L8] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L9] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L10] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L11] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L12] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L13] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L14] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L15] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L16] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L17] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L18] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L19] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L20] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L21] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L22] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L23] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L24] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L25] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L26] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L27] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L28] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L29] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L30] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+[0;36m(EngineCore_DP0 pid=1662048)[0;0m INFO 02-09 18:41:58 [quest.py:437] [Quest L31] forward(): is_prefill=False, seq_len=984, num_tokens=1, current_kv_len=984
+   Prompt length: ~726 words
+   Generated: ' The quick brown fox jumps over the lazy'
+✅ Long context test passed!
+
+================================================================================
+TEST SUMMARY
+================================================================================
+✅ Passed:  2
+⏭️  Skipped: 0
+❌ Failed:  0
+================================================================================
+
+🎉 ALL TESTS PASSED! 🎉
+
+Quest Standalone KV Cache Integration:
+  ✅ Quest manages own KV cache + metadata cache
+  ✅ No vLLM KV cache dependency
+  ✅ Sparse decode attention works
+  ✅ MHA support (OPT-125M)
+  ✅ Multi-GPU (TP) ready (automatic)
+================================================================================
