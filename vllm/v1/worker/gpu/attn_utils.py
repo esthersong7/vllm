@@ -134,8 +134,22 @@ def init_kv_cache(
     attn_backends: dict[str, AttentionBackend],
     device: torch.device,
 ) -> dict[str, torch.Tensor]:
-    kv_cache_raw_tensors = _allocate_kv_cache(kv_cache_config, device)
-    kv_caches = _reshape_kv_cache(kv_cache_config, kv_cache_raw_tensors, attn_backends)
+    use_quest_placeholder_kv = (
+        len(attn_backends) > 0
+        and all(backend.get_name() == "QUEST" for backend in attn_backends.values())
+    )
+    if use_quest_placeholder_kv:
+        # Quest manages KV storage outside vLLM. Bind lightweight placeholders
+        # so the forward path still receives kv_cache tensors.
+        placeholder = torch.empty(0, dtype=torch.uint8, device=device)
+        kv_caches = {
+            layer_name: placeholder for layer_name in attn_backends.keys()
+        }
+    else:
+        kv_cache_raw_tensors = _allocate_kv_cache(kv_cache_config, device)
+        kv_caches = _reshape_kv_cache(
+            kv_cache_config, kv_cache_raw_tensors, attn_backends
+        )
     bind_kv_cache(kv_caches, forward_context, runner_kv_caches)
     return kv_caches
 

@@ -1138,6 +1138,46 @@ def get_kv_cache_config_from_groups(
                 KVCacheTensor(size=page_size * num_blocks, shared_by=shared_by)
             )
 
+    # QUEST uses a standalone KV cache implementation. vLLM KV tensors may be
+    # placeholders, but the scheduler still relies on kv_cache_config.num_blocks.
+    # Ensure enough logical blocks so long prompts are schedulable even when
+    # gpu_memory_utilization is intentionally kept low.
+    backend = vllm_config.attention_config.backend
+    is_quest_backend = (
+        backend is not None and getattr(backend, "name", "").upper() == "QUEST"
+    )
+    if is_quest_backend:
+        # Respect explicit Quest runtime cap when provided; otherwise use
+        # vLLM max_model_len as the minimum schedulable capacity target.
+        quest_max_seq_len = int(
+            os.getenv(
+                "VLLM_QUEST_MAX_SEQ_LEN",
+                str(vllm_config.model_config.max_model_len),
+            )
+        )
+        target_seq_len = max(vllm_config.model_config.max_model_len, quest_max_seq_len)
+        required_blocks = cdiv(target_seq_len, vllm_config.cache_config.block_size) + 1
+        if num_blocks < required_blocks:
+            old_num_blocks = num_blocks
+            logger.warning(
+                "QUEST backend: increasing logical KV blocks for scheduler from %d "
+                "to %d (target_seq_len=%d, block_size=%d).",
+                num_blocks,
+                required_blocks,
+                target_seq_len,
+                vllm_config.cache_config.block_size,
+            )
+            num_blocks = required_blocks
+            # Keep KVCacheTensor bookkeeping consistent with num_blocks.
+            # (QUEST mode may skip real vLLM KV allocation, but later config
+            # normalization still expects tensor.size to be proportional to
+            # num_blocks.)
+            if old_num_blocks > 0:
+                for tensor in kv_cache_tensors:
+                    if tensor.size % old_num_blocks == 0:
+                        per_block_bytes = tensor.size // old_num_blocks
+                        tensor.size = per_block_bytes * num_blocks
+
     return KVCacheConfig(
         num_blocks=num_blocks,
         kv_cache_tensors=kv_cache_tensors,
@@ -1512,7 +1552,22 @@ def get_kv_cache_configs(
 
     # Check if the available memory is enough (using min across all workers).
     # We use the global groups to correctly account for padding.
-    if global_kv_cache_groups:
+    #
+    # Quest backend manages KV cache outside vLLM's cache tensors. In that case,
+    # skip this vLLM KV-fit check so initialization is not blocked by vLLM-side
+    # KV capacity assumptions.
+    backend = vllm_config.attention_config.backend
+    skip_vllm_kv_fit_check = (
+        backend is not None and getattr(backend, "name", "").upper() == "QUEST"
+    )
+    if skip_vllm_kv_fit_check:
+        logger.warning(
+            "Skipping vLLM KV cache fit check since the attention backend is "
+            "QUEST, which manages KV cache outside of vLLM's control. Make sure "
+            "the QUEST backend is configured with enough KV cache capacity to "
+            "avoid out-of-memory errors during inference."
+        )
+    if global_kv_cache_groups and not skip_vllm_kv_fit_check:
         _check_enough_kv_cache_memory(
             min(available_memory),
             lambda: _max_memory_usage_bytes_from_groups(
@@ -1547,20 +1602,40 @@ def get_kv_cache_configs(
             )
         )
 
-    # Change the num_blocks of each rank to the smallest among all ranks.
-    # We also need to shrink the tensor size proportionally to avoid
-    # allocating unused memory.
-    min_num_blocks = min(
-        kv_cache_config.num_blocks for kv_cache_config in kv_cache_configs
+    # Change the num_blocks of each rank to a common value and adjust tensor
+    # bookkeeping proportionally.
+    # - Default path: use the smallest across ranks to avoid over-allocation.
+    # - QUEST path: use the largest across ranks because vLLM KV tensors are
+    #   placeholders and num_blocks is mainly a scheduler logical capacity.
+    target_num_blocks = (
+        max(kv_cache_config.num_blocks for kv_cache_config in kv_cache_configs)
+        if skip_vllm_kv_fit_check
+        else min(kv_cache_config.num_blocks for kv_cache_config in kv_cache_configs)
     )
     for kv_cache_config in kv_cache_configs:
         num_blocks_old = kv_cache_config.num_blocks
-        kv_cache_config.num_blocks = min_num_blocks
+        kv_cache_config.num_blocks = target_num_blocks
 
         # Shrink tensor size proportionally
         for tensor in kv_cache_config.kv_cache_tensors:
-            assert tensor.size % num_blocks_old == 0
-            tensor.size = tensor.size // num_blocks_old * min_num_blocks
+            if tensor.size % num_blocks_old != 0:
+                if skip_vllm_kv_fit_check:
+                    # QUEST logical mode: keep running even if a prior custom
+                    # patch produced non-proportional tensor bookkeeping.
+                    logger.warning(
+                        "QUEST backend: non-proportional KV tensor bookkeeping "
+                        "detected (tensor.size=%d, num_blocks=%d). "
+                        "Adjusting size conservatively.",
+                        tensor.size,
+                        num_blocks_old,
+                    )
+                    per_block_bytes = (
+                        tensor.size // num_blocks_old if num_blocks_old > 0 else 0
+                    )
+                    tensor.size = per_block_bytes * target_num_blocks
+                    continue
+                assert tensor.size % num_blocks_old == 0
+            tensor.size = tensor.size // num_blocks_old * target_num_blocks
 
         if len(kv_cache_config.kv_cache_groups) > 0:
             _report_kv_cache_config(vllm_config, kv_cache_config)
